@@ -1,85 +1,98 @@
-## Github Link 
-	https://github.com/spatie/laravel-db-snapshots
+<p align="center"><img src="https://laravel.com/assets/img/components/logo-laravel.svg"></p>
 
-## Create Project 
-	laravel new db-snapshot
+## Laravel Database Snapshot Admin UI
 
-	Database Snapshot is use for quickly dump and load databases in laravel.You can create sql file or compressed sql file.there are many commnad like list all snapshot files, Load spanshot files, Delete snapshot files and download snapshot file.There are several events like Creating Snapshot ,Created Snapshot, Loading Snapshot, Loaded Snapshot, Deleting Snapshot, Deleted Snapshot fired which can be used to perform some logic of your own.
+Laravel Database Snapshot Admin UI is one type of admin panel in which you can take a snapshot of the database, show previously taken database snapshot list, download snapshot SQL file and delete the snapshot file. 
 
-## Install the package via Composer
-	composer require spatie/laravel-db-snapshots
+- **Create a Laravel Project**
+		Laravel new db-snapshot-admin-UI 
 
-## If Laravel 5.4 or below you must install this service provider to config/app.php otherwise will autoregister the service provider
-	
-	'providers' => [
-		// ...
-		Spatie\DbSnapshots\DbSnapshotsServiceProvider::class,
-	];
+- **Install Database Snapshot Package Via Composer**
+		composer require spatie/laravel-db-snapshots
 
-## In app/config/filesystems.php file specify a disk named snapshots on which snapshots will be saved.
+- **Service Provider Configuration**
+		If Laravel 5.4 or below version you must add below code otherwise it will be auto-registered.
+		Open the file config/app.php and then add following service provider
+			```
+			'providers' => [
+				// ...
+				Spatie\DbSnapshots\DbSnapshotsServiceProvider::class,
+			];
+			```
 
-	// ...
-	'disks' => [
-		// ...
-		'snapshots' => [
-			'driver' => 'local',
-			'root' => storage_path('snapshots'),
-		],
-	// ...    
+- **Filesystem Configuration**
+		In config/filesystems.php add following code for creating snapshot disk on which all snapshots will be saved. You can change the driver and root values. 
+			```
+			// ...
+			'disks' => [
+				// ...
+				'snapshots' => [
+					'driver' => 'local',
+					'root' => storage_path('snapshots'),
+				],
+			// ... 
+			```
 
+- **Publish The Configuration File**
+		This is optional, you may publish the configuration file using this command to customize your setting.
+			php artisan vendor:publish --provider="Spatie\DbSnapshots\DbSnapshotsServiceProvider" --tag="config"
 
-## This is Optionally, you may publish the configuration file using this command	
-	php artisan vendor:publish --provider="Spatie\DbSnapshots\DbSnapshotsServiceProvider" --tag="config"  
-														//publish configutation file will be store inside confing folder
+- **Create an admin login using laravel auth**
+		php artisan make:auth
 
-## Environment configuration for database connection
+- **Database configuration**
+		In Env file, specify the value of host, database name, user name, password.
+			```
+			DB_HOST=YOUR_HOST
+			DB_DATABASE=YOUR_DATABASE
+			DB_USERNAME=YOUR_USERNAME
+			DB_PASSWORD=YOUR_PASSWORD
+			```
 
-	DB_HOST=YOUR_HOST
-	DB_DATABASE=YOUR_DATABASE
-	DB_USERNAME=YOUR_USERNAME
-	DB_PASSWORD=YOUR_PASSWORD
+- **Create Migrations**
 
-## Creating Migrations and Run Migration Command
+- **Create Database Snapshot**
+		```
+		$search = ["_"];
+		$replace = ["-"];
+		$file_name = str_replace($search, $replace, $request->snapshot_name).'_'.Carbon::now()->format('Y-m-d.H:i:s');
+		Artisan::call('snapshot:create '.$file_name);
+		```
 
-	php artisan migrate:make create_users_table			// Create users table 
-	php artisan migrate									// Run migration
+- **Snapshots List**
 
-## Create Seeder and Run Seeder Command
-
-	php artisan make:seeder UsersTableDataSeeder 		// Create users table seeder 
-	php artisan db:seed --class=UsersTableDataSeeder 	// Run seeder for users table
-
-## Create Database Snapshot
-
-	$file_name = str_replace($search, $replace, $file_name); // File name not conatin whitespace or pipeline
-	Artisan::call('snapshot:create '.$file_name); 		// file name is optional. If you don't pass a file name the current date time will be used as file name
-
-## To list of all snapshot file
-
-	Artisan::call('snapshot:list');
-	$snapshot_data = Artisan::output(); // get artisan output
-	$snapshot_data = array_filter(explode("\n", $snapshot_data));  // Get File name, date and size
-	$snapshot_list = [];
+	````
+ 	Artisan::call('snapshot:list');
+   	$snapshot_data = Artisan::output();
+  	$snapshot_data = array_filter(explode("\n", $snapshot_data));
+   	$snapshot_list = new Collection;
 	if(count($snapshot_data) != 1) {
-		foreach ($snapshot_data as $index =>$snapshot_list_row) {
-			if( $snapshot_list_row[0] != "+" ) {               
-				if( $index != 1 ) {                    
-					$snapshot_list_column = array_map('trim', array_filter(explode("|", $snapshot_list_row)));	                
-					$snapshot_list[$index]["Name"] = $snapshot_list_column[1];            	// Get File Name      
-					$snapshot_list[$index]["date"] = $snapshot_list_column[2];				// Get Date 
-					$snapshot_list[$index]["size"] = $snapshot_list_column[3];	            // Get File size                  
-				} 
-			}
-		} 
-	}
+       foreach ($snapshot_data as $index =>$snapshot_list_row) {
+           if( $snapshot_list_row[0] != "+" ) {               
+               if( $index != 1 ) {                    
+                   $snapshot_list_column = array_map('trim', array_filter(explode("|", $snapshot_list_row)));
+                   $file_name = $snapshot_list_column[1];
+                   $name = explode("_", $snapshot_list_column[1]);
+                   $date = $snapshot_list_column[2];
+                   $size = $snapshot_list_column[3];
+                   $snapshot_list->push([                       
+                       'name'      => $name[0],
+                       'date'      => $date,
+                       'size'      => $size,
+                       'action'    => "<a href='".route('DBSnapshotDownload', $file_name)."' class='text-info'><i class='fa fa-download'></i></a>&nbsp;&nbsp;<a href='".route('DBSnapshotDelete', $file_name)."' onclick=\"return confirm('Are you sure you want to delete this item?');\" class='text-danger'><i class='fa fa-trash'></i></a>"
+                   ]);                                
+               } 
+           }
+       } 
+    }
+	````
+- **Download Snapshot file**
+	return response()->download(storage_path("snapshots/".$snapshot_name.'.sql'));
 
-## Delete Snapshot file
-	Artisan::call('snapshot:delete '.$file_name); 		// pass file name to delete that file
+- **Delete Snapshot file**
+	Artisan::call('snapshot:delete '.$snapshot_name);
 
-## Download path of snapshot file
-	storage_path("snapshots/".$filename.'.sql'); 		// get download path where sql file is store
-
-## Some useful console commands for db snapshot
+- **Some useful console commands for database snapshot**
 
 	php artisan snapshot:create file-name   			// create snapshot with given name
 	php artisan snapshot:create							// current date time used for file name to create snapshot
@@ -90,7 +103,7 @@
 	php artisan snapshot:list							// List of all snapshots
 	php artisan snapshot:delete file-name 				// Delete snapshot 
 
-## Some useful events
+- **Some useful events**
 
 	Spatie\DbSnapshots\Events\CreatingSnapshot  		// Event will be fired before a snapshot is created
 	Spatie\DbSnapshots\Events\CreatedSnapshot  			// Event will be fired after a snapshot has been created
@@ -98,3 +111,6 @@
 	Spatie\DbSnapshots\Events\LoadedSnapshot  			// Event will be fired after a snapshot has been loaded
 	Spatie\DbSnapshots\Events\DeletingSnapshot  		// Event will be fired before a snapshot is deleted
 	Spatie\DbSnapshots\Events\DeletedSnapshot  			// Event will be fired after a snapshot has been deleted
+
+
+[Laravel DB Snapshot Package Github Link](https://github.com/spatie/laravel-db-snapshots)
